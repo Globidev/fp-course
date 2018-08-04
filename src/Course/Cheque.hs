@@ -187,7 +187,7 @@ data Digit =
   | Seven
   | Eight
   | Nine
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 showDigit ::
   Digit
@@ -323,5 +323,85 @@ fromChar _ =
 dollars ::
   Chars
   -> Chars
-dollars =
-  error "todo: Course.Cheque#dollars"
+dollars rawAmount =
+  showRound ++ " and " ++ showCents
+
+  where
+    showRound =
+      let amount = rounds rawAmount
+      in showNumber amount ++ (pluralize amount "dollar")
+
+    showCents =
+      let amount = cents rawAmount
+      in showNumber amount ++ (pluralize amount "cent")
+
+    rounds = (correctRounds . reifyAmount . takeWhile (/='.'))
+    cents = (correctCents . reifyAmount . drop 1 . dropWhile (/='.'))
+
+    reifyAmount = listOptional fromChar
+
+    correctCents Nil = pure Zero
+    correctCents (t :. Nil) = (t :. Zero :. Nil)
+    correctCents (t :. u :. _) = (t :. u :. Nil)
+
+    correctRounds Nil = pure Zero
+    correctRounds x = x
+
+    pluralize :: List Digit -> Chars -> Chars
+    pluralize (Zero :. xs) s = pluralize xs s
+    pluralize (One :. Nil) s = s
+    pluralize _ s = s ++ "s"
+
+    showNumber :: List Digit -> Chars
+    showNumber n =
+      let grouped = group3 n
+          groupedIllions = zipWith joinIllions (reverse grouped) illion
+      in drop 1 $ foldRight (flip joinSpaced) "" (filter (not . isEmpty) groupedIllions)
+
+    show3 :: (Digit, Digit, Digit) -> Chars
+    show3 (Zero, Zero, u)    = showDigit u
+    show3 (Zero, d,    u)    = showTens d u
+    show3 (h,    Zero, Zero) = showDigit h ++ " hundred"
+    show3 (h,    d,    u)    = showDigit h ++ " hundred and " ++ showTens d u
+
+    joinSpaced :: Chars -> Chars -> Chars
+    joinSpaced a b = a ++ " " ++ b
+
+    joinIllions (Zero, Zero, Zero) "" = "zero "
+    joinIllions (Zero, Zero, Zero) _ = ""
+    joinIllions x i = joinSpaced (show3 x) i
+
+    showTens Zero u     = showDigit u
+    showTens One  Zero  = "ten"
+    showTens One  One   = "eleven"
+    showTens One  Two   = "twelve"
+    showTens One  Three = "thirteen"
+    showTens One  Four  = "fourteen"
+    showTens One  Five  = "fifteen"
+    showTens One  Six   = "sixteen"
+    showTens One  Seven = "seventeen"
+    showTens One  Eight = "eighteen"
+    showTens One  Nine  = "nineteen"
+    showTens d    Zero  = tenPrefix d
+    showTens d    u     = tenPrefix d ++ "-" ++ showDigit u
+
+    tenPrefix Two   = "twenty"
+    tenPrefix Three = "thirty"
+    tenPrefix Four  = "forty"
+    tenPrefix Five  = "fifty"
+    tenPrefix Six   = "sixty"
+    tenPrefix Seven = "seventy"
+    tenPrefix Eight = "eighty"
+    tenPrefix Nine  = "ninety"
+    tenPrefix _     = "?"
+
+group3 ::
+  List Digit
+  -> List (Digit, Digit, Digit)
+group3 ds =
+  reverse $ group $ reverse ds
+  where
+    group Nil = Nil
+    group (x :. Nil) = pure (Zero, Zero, x)
+    group (x :. y :. Nil) = pure (Zero, y, x)
+    group (x :. y :. z :. xs) = (z, y, x) :. group xs
