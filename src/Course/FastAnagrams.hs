@@ -14,8 +14,18 @@ fastAnagrams ::
   Chars
   -> FilePath
   -> IO (List Chars)
-fastAnagrams =
-  error "todo: Course.FastAnagrams#fastAnagrams"
+fastAnagrams s fp =
+  let allAnagrams = permutations s
+      anagramsSet = S.fromList (toNoCaseList allAnagrams)
+      dict = S.fromList . toNoCaseList . lines <$> readFile fp
+  in fromNoCaseSet . S.intersection anagramsSet <$> dict
+
+  where
+    toNoCaseList = hlist . (map NoCaseString)
+    fromNoCaseSet = map ncString . listh . S.toList
+
+instance Ord NoCaseString where
+  compare = compare `on` map toLower . ncString
 
 newtype NoCaseString =
   NoCaseString {
